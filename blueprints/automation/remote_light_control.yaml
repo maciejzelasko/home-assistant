@@ -1,0 +1,128 @@
+blueprint:
+  name: Two-button remote light control
+  description: >-
+    Control one light with a Matter-compatible two-button remote. A short press
+    on button 1 turns the light on, button 2 turns it off, and long presses
+    adjust brightness.
+  domain: automation
+  author: Maciej Żelasko
+  source_url: https://github.com/maciejzelasko/home-assistant/blob/main/blueprints/automation/remote_light_control.yaml
+  homeassistant:
+    min_version: "2024.10.0"
+  input:
+    devices:
+      name: Devices
+      icon: mdi:remote
+      input:
+        target_light:
+          name: Light to control
+          selector:
+            target:
+              entity:
+                domain: light
+        button_1:
+          name: Remote button 1
+          selector:
+            entity:
+              domain: event
+              device_class: button
+        button_2:
+          name: Remote button 2
+          selector:
+            entity:
+              domain: event
+              device_class: button
+    settings:
+      name: Settings
+      icon: mdi:cog
+      collapsed: true
+      input:
+        on_brightness:
+          name: Brightness when turning on
+          default: 100
+          selector:
+            number:
+              min: 1
+              max: 100
+              step: 1
+              unit_of_measurement: "%"
+              mode: slider
+        brightness_step:
+          name: Brightness adjustment step
+          default: 10
+          selector:
+            number:
+              min: 1
+              max: 100
+              step: 1
+              unit_of_measurement: "%"
+              mode: slider
+
+mode: queued
+max: 10
+
+variables:
+  brightness_step: !input brightness_step
+
+triggers:
+  - trigger: event.received
+    target:
+      entity_id: !input button_1
+    options:
+      event_type:
+        - multi_press_1
+    id: button_1_short
+  - trigger: event.received
+    target:
+      entity_id: !input button_2
+    options:
+      event_type:
+        - multi_press_1
+    id: button_2_short
+  - trigger: event.received
+    target:
+      entity_id: !input button_1
+    options:
+      event_type:
+        - long_press
+    id: button_1_long
+  - trigger: event.received
+    target:
+      entity_id: !input button_2
+    options:
+      event_type:
+        - long_press
+    id: button_2_long
+
+actions:
+  - choose:
+      - conditions:
+          - condition: trigger
+            id: button_1_short
+        sequence:
+          - action: light.turn_on
+            target: !input target_light
+            data:
+              brightness_pct: !input on_brightness
+      - conditions:
+          - condition: trigger
+            id: button_2_short
+        sequence:
+          - action: light.turn_off
+            target: !input target_light
+      - conditions:
+          - condition: trigger
+            id: button_1_long
+        sequence:
+          - action: light.turn_on
+            target: !input target_light
+            data:
+              brightness_step_pct: !input brightness_step
+      - conditions:
+          - condition: trigger
+            id: button_2_long
+        sequence:
+          - action: light.turn_on
+            target: !input target_light
+            data:
+              brightness_step_pct: "{{ -brightness_step }}"
